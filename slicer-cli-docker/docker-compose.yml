@@ -1,0 +1,6 @@
+services:
+  dive-slicer-drone:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ghcr.io/bryonlewis/dive-slicer-drone/dive-slicer-drone:${TAG:-latest}
