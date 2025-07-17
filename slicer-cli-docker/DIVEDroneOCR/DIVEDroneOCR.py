@@ -157,14 +157,12 @@ def process_video(path: str, frame_step: int):
         logging.info(f"[{timestamp}] Voltage: {voltage_text}, Throttle: {throttle_text}, Status: {status_text}")
 
         attributes = {}
-        throttle_val = safe_float(throttle_text)
-        voltage_val = safe_float(voltage_text)
+        throttle_val = safe_float(throttle_text) or 0.0
+        voltage_val = safe_float(voltage_text) or 0.0
         if status_text:
             attributes["status"] = status_text
-        if throttle_val is not None and throttle_val <= 100:
-            attributes["throttle"] = throttle_val
-        if voltage_val is not None:
-            attributes["voltage"] = voltage_val
+        attributes["throttle"] = min(throttle_val, 100.0)
+        attributes["voltage"] = voltage_val
 
         track_obj["features"].append({
             "frame": frame_idx,
@@ -241,9 +239,9 @@ def process_video(path: str, frame_step: int):
 
 
 def calculate_stats(features):
-    throttle_vals = [f["attributes"]["throttle"]
-                    for f in features if "throttle" in f["attributes"] and f["attributes"]["throttle"] > 0]
-    voltage_vals = [f["attributes"]["voltage"]
+    throttle_vals = [f["attributes"].get("throttle", 0.0)
+                    for f in features if f["attributes"].get("throttle", 0.0) > 0]
+    voltage_vals = [f["attributes"].get("voltage", 0.0)
                     for f in features if "voltage" in f["attributes"]]
 
     avg_throttle = round(mean(throttle_vals), 2) if throttle_vals else 0.0
@@ -375,18 +373,18 @@ def process_metadata(args, gc: girder_client.GirderClient, stats):
     logging.info(f'Current Filter Values: {current_filter_values}')
     logging.info(f'MetadataRoot: {DIVEMetadataRoot} DatasetId: {DIVEDatasetId} MetadataKey: {MetadataKey} MetadataValue: {MetadataValue}')
     logging.info(f'Stats: {stats}')
-    add_new_metadata(gc, DIVEMetadataRoot, DIVEDatasetId, current_filter_values, 'Average Throttle', stats['avg_throttle'], 'numerical',False)
-    add_new_metadata(gc, DIVEMetadataRoot, DIVEDatasetId, current_filter_values, 'Average Battery', stats['avg_voltage'], 'numerical',False)
-    add_new_metadata(gc, DIVEMetadataRoot, DIVEDatasetId, current_filter_values, 'Total Crashes', stats['crash_count'], 'numerical',False)
-    add_new_metadata(gc, DIVEMetadataRoot, DIVEDatasetId, current_filter_values, 'Recovered Crashes', stats['recovered_crash'], 'numerical',False)
-    add_new_metadata(gc, DIVEMetadataRoot, DIVEDatasetId, current_filter_values, 'Ending Crashes', stats['ending_crash'], 'numerical',False)
+    add_new_metadata(gc, DIVEMetadataRoot, DIVEDatasetId, current_filter_values, 'Average Throttle', stats['avg_throttle'], 'numerical',False, 0)
+    add_new_metadata(gc, DIVEMetadataRoot, DIVEDatasetId, current_filter_values, 'Average Battery', stats['avg_voltage'], 'numerical',False, 0)
+    add_new_metadata(gc, DIVEMetadataRoot, DIVEDatasetId, current_filter_values, 'Total Crashes', stats['crash_count'], 'numerical',False, 0)
+    add_new_metadata(gc, DIVEMetadataRoot, DIVEDatasetId, current_filter_values, 'Recovered Crashes', stats['recovered_crash'], 'numerical',False, 0)
+    add_new_metadata(gc, DIVEMetadataRoot, DIVEDatasetId, current_filter_values, 'Ending Crashes', stats['ending_crash'], 'numerical',False, 0)
 
 
-def add_new_metadata(gc: girder_client.GirderClient, DIVEMetadataRoot, DIVEDatasetId, current_values, key, value, category = 'search', unlocked = False):
+def add_new_metadata(gc: girder_client.GirderClient, DIVEMetadataRoot, DIVEDatasetId, current_values, key, value, category = 'search', unlocked = False, default_value = None):
     if key not in current_values['metadataKeys'].keys():
         logging.info('Adding the new key to MetadataRoot')
         # Field should be unlocked if the user who is running the task is not the owner.  Only owners can add new data to fields.
-        gc.put(f'dive_metadata/{DIVEMetadataRoot}/add_key', {"key": key, "value": value, "category": "search", "unlocked": unlocked})
+        gc.put(f'dive_metadata/{DIVEMetadataRoot}/add_key', {"key": key, "value": value, "category": "search", "unlocked": unlocked, "default_value": default_value})
 
         # If we want the new Metadata Item to not be under the Advanced section we should add it to the main Display
         root_data = gc.get(f'folder/{DIVEMetadataRoot}')
@@ -396,7 +394,7 @@ def add_new_metadata(gc: girder_client.GirderClient, DIVEMetadataRoot, DIVEDatas
             logging.info(diveMetadataFilter)
             gc.put(f'/folder/{DIVEMetadataRoot}/metadata', json={'DIVEMetadataFilter': diveMetadataFilter})
     # Now we set the actual value to the system
-    gc.patch(f'dive_metadata/{DIVEDatasetId}', {"key": key, "value": value})
+    gc.patch(f'dive_metadata/{DIVEDatasetId}', {"key": key, "value": value, "rootId": DIVEMetadataRoot})
 
 
 def main(args):
