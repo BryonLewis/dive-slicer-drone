@@ -386,7 +386,7 @@ def add_new_metadata(gc: girder_client.GirderClient, DIVEMetadataRoot, DIVEDatas
     if key not in current_values['metadataKeys'].keys():
         logging.info('Adding the new key to MetadataRoot')
         # Field should be unlocked if the user who is running the task is not the owner.  Only owners can add new data to fields.
-        gc.put(f'dive_metadata/{DIVEMetadataRoot}/add_key', {"key": key, "value": value, "category": "search", "unlocked": unlocked})
+        gc.put(f'dive_metadata/{DIVEMetadataRoot}/add_key', {"key": key, "value": value, "category": category, "unlocked": unlocked, "default_value": default_value})
 
         # If we want the new Metadata Item to not be under the Advanced section we should add it to the main Display
         root_data = gc.get(f'folder/{DIVEMetadataRoot}')
